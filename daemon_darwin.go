@@ -8,7 +8,6 @@ package daemon
 import (
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"text/template"
 )
@@ -20,7 +19,7 @@ type darwinRecord struct {
 	dependencies []string
 }
 
-func newDaemon(name, description string, dependencies []string) (Daemon, error) {
+func newDaemon(name, description string, dependencies []string) (*darwinRecord, error) {
 
 	return &darwinRecord{name, description, dependencies}, nil
 }
@@ -38,11 +37,6 @@ func (darwin *darwinRecord) isInstalled() bool {
 	}
 
 	return false
-}
-
-// Get executable path
-func execPath() (string, error) {
-	return filepath.Abs(os.Args[0])
 }
 
 // Check service is running
@@ -63,7 +57,7 @@ func (darwin *darwinRecord) checkRunning() (string, bool) {
 }
 
 // Install the service
-func (darwin *darwinRecord) Install(args ...string) (string, error) {
+func (darwin *darwinRecord) Install(execPath string, args ...string) (string, error) {
 	installAction := "Install " + darwin.description + ":"
 
 	if ok, err := checkPrivileges(); !ok {
@@ -82,11 +76,6 @@ func (darwin *darwinRecord) Install(args ...string) (string, error) {
 	}
 	defer file.Close()
 
-	execPatch, err := executablePath(darwin.name)
-	if err != nil {
-		return installAction + failed, err
-	}
-
 	templ, err := template.New("propertyList").Parse(propertyList)
 	if err != nil {
 		return installAction + failed, err
@@ -97,7 +86,7 @@ func (darwin *darwinRecord) Install(args ...string) (string, error) {
 		&struct {
 			Name, Path string
 			Args       []string
-		}{darwin.name, execPatch, args},
+		}{darwin.name, execPath, args},
 	); err != nil {
 		return installAction + failed, err
 	}
